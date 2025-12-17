@@ -16,6 +16,70 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# 下载辅助函数 - 带重试和完整性检查
+download_with_retry() {
+    local url="$1"
+    local output="$2"
+    local max_retries="${3:-3}"
+    local description="${4:-文件}"
+
+    for attempt in $(seq 1 $max_retries); do
+        if [ $attempt -gt 1 ]; then
+            echo "  重试 $attempt/$max_retries: $description"
+        fi
+
+        if wget -c -q --show-progress --timeout=60 "$url" -O "$output" 2>&1; then
+            if [ -f "$output" ] && [ -s "$output" ]; then
+                return 0
+            fi
+        fi
+
+        if [ $attempt -lt $max_retries ]; then
+            sleep 2
+        fi
+    done
+
+    return 1
+}
+
+# 批量下载包函数
+download_packages_batch() {
+    local package_list="$1"
+    local description="$2"
+    local failed_packages=()
+
+    echo "批量下载: $description"
+
+    for pkg in $package_list; do
+        echo -n "  下载 $pkg... "
+        if apt-get download "$pkg" 2>/dev/null 1>&2; then
+            echo -e "${GREEN}✓${NC}"
+        else
+            echo -e "${YELLOW}失败${NC}"
+            failed_packages+=("$pkg")
+        fi
+    done
+
+    if [ ${#failed_packages[@]} -gt 0 ]; then
+        echo ""
+        echo "重试失败的包..."
+        for pkg in "${failed_packages[@]}"; do
+            for attempt in $(seq 1 2); do
+                echo -n "  重试 $pkg (尝试 $attempt/2)... "
+                if apt-get download "$pkg" 2>/dev/null 1>&2; then
+                    echo -e "${GREEN}✓${NC}"
+                    break
+                else
+                    echo -e "${YELLOW}失败${NC}"
+                    if [ $attempt -eq 2 ]; then
+                        echo -e "    ${RED}⚠ $pkg 下载失败，但继续...${NC}"
+                    fi
+                fi
+            done
+        done
+    fi
+}
+
 # 配置 - 可根据需要修改
 NVIDIA_DRIVER_VERSION="550.127.05"
 CUDA_VERSION="12.9"
@@ -78,14 +142,38 @@ echo "下载驱动安装包: $DRIVER_FILENAME"
 echo "下载地址: $DRIVER_URL"
 cd "$DRIVER_DIR"
 
-if [ ! -f "$DRIVER_FILENAME" ]; then
-    echo "开始下载..."
-    if wget --show-progress --timeout=60 "$DRIVER_URL"; then
-        echo -e "${GREEN}✓${NC} 驱动下载成功"
+# 检查已存在文件的完整性
+if [ -f "$DRIVER_FILENAME" ]; then
+    echo "检测到已存在的驱动文件，验证完整性..."
+    REMOTE_SIZE=$(curl -sI "$DRIVER_URL" | grep -i Content-Length | awk '{print $2}' | tr -d '\r')
+    LOCAL_SIZE=$(stat -f%z "$DRIVER_FILENAME" 2>/dev/null || stat -c%s "$DRIVER_FILENAME" 2>/dev/null)
+
+    if [ "$REMOTE_SIZE" = "$LOCAL_SIZE" ] && [ ! -z "$REMOTE_SIZE" ]; then
+        echo -e "${GREEN}✓${NC} 驱动文件完整，跳过下载"
         chmod +x "$DRIVER_FILENAME"
     else
+        echo "  文件不完整，将重新下载..."
+        rm -f "$DRIVER_FILENAME"
+    fi
+fi
+
+# 下载驱动文件（支持断点续传和重试）
+if [ ! -f "$DRIVER_FILENAME" ]; then
+    echo "开始下载驱动 (支持断点续传)..."
+    if download_with_retry "$DRIVER_URL" "$DRIVER_FILENAME" 5 "NVIDIA 驱动"; then
+        echo -e "${GREEN}✓${NC} 驱动下载成功"
+        chmod +x "$DRIVER_FILENAME"
+
+        # 验证下载后的文件完整性
+        REMOTE_SIZE=$(curl -sI "$DRIVER_URL" | grep -i Content-Length | awk '{print $2}' | tr -d '\r')
+        LOCAL_SIZE=$(stat -f%z "$DRIVER_FILENAME" 2>/dev/null || stat -c%s "$DRIVER_FILENAME" 2>/dev/null)
+
+        if [ "$REMOTE_SIZE" != "$LOCAL_SIZE" ] || [ -z "$REMOTE_SIZE" ]; then
+            echo -e "${YELLOW}⚠${NC} 警告: 无法验证文件完整性，但下载已完成"
+        fi
+    else
         echo ""
-        echo -e "${RED}错误: 驱动下载失败${NC}"
+        echo -e "${RED}错误: 驱动下载失败 (已尝试 5 次)${NC}"
         echo ""
         echo -e "${YELLOW}手动下载选项:${NC}"
         echo ""
@@ -113,8 +201,6 @@ if [ ! -f "$DRIVER_FILENAME" ]; then
             chmod +x "$DRIVER_FILENAME"
         fi
     fi
-else
-    echo -e "${GREEN}✓${NC} 驱动已存在，跳过下载"
 fi
 
 cd - > /dev/null
@@ -174,34 +260,35 @@ CUDA_PACKAGES=(
     "cuda-cudart-${CUDA_VERSION_FULL}"
     "cuda-libraries-${CUDA_VERSION_FULL}"
     "cuda-nvcc-${CUDA_VERSION_FULL}"
+    "cuda-${CUDA_VERSION_FULL}"
 )
 
-for pkg in "${CUDA_PACKAGES[@]}"; do
-    echo "  下载 $pkg..."
-    apt-get download $pkg 2>/dev/null || {
-        echo -e "    ${YELLOW}警告: $pkg 下载失败，继续...${NC}"
-    }
-done
+echo "下载 CUDA 核心包 (${#CUDA_PACKAGES[@]} 个包)..."
+download_packages_batch "${CUDA_PACKAGES[@]}"
 
-# 下载 CUDA 元数据包
-echo "下载 CUDA 依赖包..."
-apt-get download \
-    cuda-${CUDA_VERSION_FULL} \
-    2>/dev/null || true
-
-# 使用 apt-rdepends 下载所有依赖
+# 使用 apt-rdepends 分析和下载所有依赖
 if ! command -v apt-rdepends &> /dev/null; then
+    echo "安装 apt-rdepends 工具..."
     apt-get install -y apt-rdepends > /dev/null 2>&1
 fi
 
-echo "分析并下载 CUDA 依赖关系..."
+echo "分析 CUDA 依赖关系..."
+ALL_DEPS=""
 for pkg in cuda-toolkit-${CUDA_VERSION_FULL} cuda-runtime-${CUDA_VERSION_FULL}; do
-    apt-rdepends $pkg 2>/dev/null | grep -v "^ " | grep -v "^$pkg$" | sort -u | while read dep; do
-        if [ ! -z "$dep" ] && [ "$dep" != "Depends:" ] && [ "$dep" != "PreDepends:" ]; then
-            apt-get download "$dep" 2>/dev/null || true
-        fi
-    done
+    echo "  分析 $pkg 的依赖..."
+    DEPS=$(apt-rdepends $pkg 2>/dev/null | grep -v "^ " | grep -v "^$pkg$" | grep -v "^Depends:" | grep -v "^PreDepends:" | sort -u)
+    ALL_DEPS="$ALL_DEPS $DEPS"
 done
+
+# 去重
+UNIQUE_DEPS=($(echo "$ALL_DEPS" | tr ' ' '\n' | sort -u | grep -v "^$"))
+
+if [ ${#UNIQUE_DEPS[@]} -gt 0 ]; then
+    echo "下载 CUDA 依赖包 (共 ${#UNIQUE_DEPS[@]} 个包)..."
+    download_packages_batch "${UNIQUE_DEPS[@]}"
+else
+    echo -e "${YELLOW}⚠${NC} 未找到额外依赖包"
+fi
 
 # 保存 CUDA repo 配置
 cp /etc/apt/preferences.d/cuda-repository-pin-600 . 2>/dev/null || true
