@@ -15,19 +15,52 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# 下载辅助函数 - 带重试和完整性检查
+# 下载辅助函数 - 带重试、多线程和完整性检查
 download_with_retry() {
     local url="$1"
     local output="$2"
     local max_retries="${3:-3}"
     local description="${4:-文件}"
 
+    # 检查是否安装了 aria2c（支持多线程下载）
+    local use_aria2=false
+    if command -v aria2c &> /dev/null; then
+        use_aria2=true
+        echo "  使用 aria2c 多线程下载 (16线程)"
+    fi
+
     for attempt in $(seq 1 $max_retries); do
         if [ $attempt -gt 1 ]; then
             echo "  重试 $attempt/$max_retries: $description"
         fi
 
-        if wget -c -q --show-progress --timeout=60 "$url" -O "$output" 2>&1; then
+        local download_success=false
+
+        if [ "$use_aria2" = true ]; then
+            # 使用 aria2c 多线程下载（16个连接）
+            if aria2c \
+                --max-connection-per-server=16 \
+                --split=16 \
+                --min-split-size=1M \
+                --continue=true \
+                --max-tries=3 \
+                --timeout=60 \
+                --connect-timeout=30 \
+                --summary-interval=0 \
+                --console-log-level=warn \
+                --dir="$(dirname "$output")" \
+                --out="$(basename "$output")" \
+                "$url" 2>&1; then
+                download_success=true
+            fi
+        else
+            # 使用 wget 下载
+            if wget -c -q --show-progress --timeout=60 "$url" -O "$output" 2>&1; then
+                download_success=true
+            fi
+        fi
+
+        if [ "$download_success" = true ]; then
             # 简单验证：检查文件是否存在且不为空
             if [ -f "$output" ] && [ -s "$output" ]; then
                 return 0
@@ -42,43 +75,103 @@ download_with_retry() {
     return 1
 }
 
-# 批量下载包函数 - 支持并发和重试
+# 并行下载包函数 - 支持并发和重试
 download_packages_batch() {
     local package_list="$1"
     local description="$2"
+    local max_parallel="${3:-10}"  # 默认10个并发
     local failed_packages=()
+    local success_packages=()
 
-    echo "批量下载: $description"
+    echo "并行下载: $description (并发数: $max_parallel)"
 
-    for pkg in $package_list; do
-        echo -n "  下载 $pkg... "
-        if apt-get download "$pkg" 2>/dev/null 1>&2; then
-            echo -e "${GREEN}✓${NC}"
-        else
-            echo -e "${YELLOW}失败${NC}"
-            failed_packages+=("$pkg")
-        fi
+    # 创建临时目录存储下载结果
+    local temp_dir=$(mktemp -d)
+
+    # 将包列表转换为数组
+    local pkg_array=($package_list)
+    local total=${#pkg_array[@]}
+    local current=0
+
+    echo "总包数: $total"
+    echo ""
+
+    # 并行下载
+    for pkg in "${pkg_array[@]}"; do
+        # 控制并发数
+        while [ $(jobs -r | wc -l) -ge $max_parallel ]; do
+            sleep 0.1
+        done
+
+        current=$((current + 1))
+
+        # 在后台下载
+        (
+            if apt-get download "$pkg" > "$temp_dir/${pkg}.log" 2>&1; then
+                echo "SUCCESS:$pkg" >> "$temp_dir/results.txt"
+                echo -e "  [$current/$total] ${GREEN}✓${NC} $pkg"
+            else
+                echo "FAILED:$pkg" >> "$temp_dir/results.txt"
+                echo -e "  [$current/$total] ${YELLOW}✗${NC} $pkg"
+            fi
+        ) &
     done
 
-    # 重试失败的包
+    # 等待所有下载完成
+    wait
+
+    echo ""
+    echo "第一轮下载完成，检查结果..."
+
+    # 收集失败的包
+    if [ -f "$temp_dir/results.txt" ]; then
+        while IFS=':' read -r status pkg; do
+            if [ "$status" = "FAILED" ]; then
+                failed_packages+=("$pkg")
+            else
+                success_packages+=("$pkg")
+            fi
+        done < "$temp_dir/results.txt"
+    fi
+
+    echo "  成功: ${#success_packages[@]}"
+    echo "  失败: ${#failed_packages[@]}"
+
+    # 重试失败的包（串行，更稳定）
     if [ ${#failed_packages[@]} -gt 0 ]; then
         echo ""
         echo "重试失败的包..."
+        local retry_success=()
+
         for pkg in "${failed_packages[@]}"; do
+            local retried=false
             for attempt in $(seq 1 2); do
                 echo -n "  重试 $pkg (尝试 $attempt/2)... "
                 if apt-get download "$pkg" 2>/dev/null 1>&2; then
                     echo -e "${GREEN}✓${NC}"
+                    retry_success+=("$pkg")
+                    retried=true
                     break
                 else
                     echo -e "${YELLOW}失败${NC}"
-                    if [ $attempt -eq 2 ]; then
-                        echo -e "    ${RED}⚠ $pkg 下载失败，但继续...${NC}"
-                    fi
                 fi
+                sleep 1
             done
+
+            if [ "$retried" = false ]; then
+                echo -e "    ${RED}⚠ $pkg 最终失败${NC}"
+            fi
         done
+
+        # 更新失败列表
+        if [ ${#retry_success[@]} -gt 0 ]; then
+            echo ""
+            echo "重试后成功: ${#retry_success[@]} 个"
+        fi
     fi
+
+    # 清理临时目录
+    rm -rf "$temp_dir"
 }
 
 # 配置 - 可根据需要修改
