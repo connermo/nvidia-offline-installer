@@ -107,9 +107,67 @@ EOF
 fi
 
 # 检查内核头文件
-if [ ! -d "/usr/src/linux-headers-$(uname -r)" ]; then
-    echo -e "${YELLOW}⚠${NC} 未检测到当前内核的头文件"
-    echo "尝试从安装包中安装..."
+KERNEL_VERSION=$(uname -r)
+HEADERS_DIR="/usr/src/linux-headers-$KERNEL_VERSION"
+
+if [ ! -d "$HEADERS_DIR" ]; then
+    echo -e "${RED}⚠ 警告: 未检测到当前内核的头文件${NC}"
+    echo ""
+    echo "  当前内核版本: $KERNEL_VERSION"
+    echo "  需要的头文件: linux-headers-$KERNEL_VERSION"
+    echo ""
+
+    # 检查离线包中是否有对应的 linux-headers
+    if ls "$DRIVER_DIR"/linux-headers-${KERNEL_VERSION}*.deb 1> /dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} 在离线包中找到对应的内核头文件"
+        echo "将在安装依赖时自动安装"
+    else
+        echo -e "${YELLOW}✗${NC} 离线包中没有对应版本的内核头文件"
+        echo ""
+        echo -e "${YELLOW}解决方案（选择其一）:${NC}"
+        echo ""
+        echo "1. 【推荐】如果有网络连接，现在安装:"
+        echo -e "   ${CYAN}sudo apt-get install linux-headers-$KERNEL_VERSION${NC}"
+        echo ""
+        echo "2. 在下载机器上重新下载，指定正确的内核版本:"
+        echo "   ./download-with-docker.sh"
+        echo "   > 目标机器内核版本: $KERNEL_VERSION"
+        echo ""
+        echo "3. 继续安装（可能失败）"
+        echo "   驱动安装可能因缺少内核头文件而失败"
+        echo ""
+
+        read -p "是否现在尝试在线安装 linux-headers? (y/N): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "尝试在线安装 linux-headers..."
+            if apt-get update && apt-get install -y linux-headers-$KERNEL_VERSION; then
+                echo -e "${GREEN}✓${NC} 内核头文件安装成功"
+            else
+                echo -e "${RED}✗${NC} 内核头文件安装失败"
+                echo ""
+                read -p "是否继续安装驱动（可能失败）? (y/N): " -n 1 -r
+                echo ""
+                if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                    echo "安装已取消"
+                    exit 1
+                fi
+            fi
+        else
+            echo ""
+            read -p "是否继续安装（可能因缺少头文件而失败）? (y/N): " -n 1 -r
+            echo ""
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                echo "安装已取消"
+                echo ""
+                echo "请安装 linux-headers 后重新运行此脚本"
+                exit 1
+            fi
+        fi
+    fi
+    echo ""
+else
+    echo -e "${GREEN}✓${NC} 检测到内核头文件: $HEADERS_DIR"
 fi
 
 echo -e "${GREEN}✓${NC} 安装前检查完成"
