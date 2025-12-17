@@ -4,9 +4,6 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Shanghai
 
-# 配置 apt 使用最快的镜像源（可选）
-RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list || true
-
 # 安装基础工具
 RUN apt-get update && apt-get install -y \
     wget \
