@@ -1,0 +1,241 @@
+========================================
+NVIDIA GPU 环境离线安装
+快速使用指南
+========================================
+
+支持三种安装方案，根据你的需求选择：
+
+方案 A: 仅 Container Toolkit (驱动+CUDA已有)
+方案 B: 驱动 + CUDA (全新系统)
+方案 C: 完整安装 (驱动+CUDA+Container Toolkit)
+
+========================================
+方案 A: Container Toolkit (推荐已有驱动的用户)
+========================================
+
+前置条件:
+✓ NVIDIA 驱动已安装
+✓ CUDA 已安装 (可选)
+✓ Docker 已安装
+
+步骤:
+1. 下载 (联网机器):
+   $ sudo ./download-packages.sh
+
+2. 打包:
+   $ tar -czf nvidia-ct-offline.tar.gz packages/ install-offline.sh
+
+3. 传输并安装 (目标服务器):
+   $ tar -xzf nvidia-ct-offline.tar.gz
+   $ sudo ./install-offline.sh
+
+4. 验证:
+   $ docker run --rm --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
+
+下载大小: ~50-100 MB
+安装时间: ~5 分钟
+
+========================================
+方案 B: 驱动 + CUDA (推荐全新系统)
+========================================
+
+前置条件:
+✓ Ubuntu 22.04 全新系统
+✗ 无需预装任何 NVIDIA 组件
+
+步骤:
+1. 下载 (联网机器):
+   $ sudo ./download-driver-cuda.sh
+
+2. 打包:
+   $ tar -czf nvidia-driver-cuda-offline.tar.gz driver-cuda-packages/ install-driver-cuda.sh
+
+3. 传输并安装 (目标服务器):
+   $ tar -xzf nvidia-driver-cuda-offline.tar.gz
+   $ sudo ./install-driver-cuda.sh
+   $ sudo reboot
+
+4. 验证 (重启后):
+   $ nvidia-smi
+   $ nvcc --version
+
+下载大小: ~3-5 GB
+安装时间: ~15-30 分钟
+⚠️  必须重启系统！
+
+========================================
+方案 C: 完整安装 (一次性全部安装)
+========================================
+
+前置条件:
+✓ Ubuntu 22.04 系统
+✓ Docker 已安装 (可选)
+
+步骤:
+1. 下载 (联网机器):
+   $ sudo ./download-all-packages.sh
+
+2. 打包:
+   $ tar -czf nvidia-full-offline.tar.gz packages/ install-all-offline.sh
+
+3. 传输并安装 (目标服务器):
+   $ tar -xzf nvidia-full-offline.tar.gz
+   $ sudo ./install-all-offline.sh
+   (根据提示选择要安装的组件)
+
+下载大小: ~4-6 GB
+安装时间: ~20-40 分钟
+
+========================================
+快速启动 (推荐新手)
+========================================
+
+使用交互式向导:
+$ sudo ./quick-start.sh
+
+向导会自动引导你选择合适的方案。
+
+========================================
+常用命令速查
+========================================
+
+查看 GPU:
+$ nvidia-smi
+
+查看 CUDA 版本:
+$ nvcc --version
+$ cat /usr/local/cuda/version.txt
+
+运行 GPU 容器:
+$ docker run --gpus all your-image
+
+使用指定 GPU:
+$ docker run --gpus '"device=0,1"' your-image
+$ CUDA_VISIBLE_DEVICES=0,1 python train.py
+
+验证安装:
+$ sudo ./verify-installation.sh
+
+========================================
+典型使用场景
+========================================
+
+场景 1: 服务器已有驱动，只需 Docker GPU 支持
+→ 使用方案 A (Container Toolkit)
+
+场景 2: 全新服务器，需要 CUDA 开发环境
+→ 使用方案 B (驱动 + CUDA)
+
+场景 3: 全新服务器，需要完整 GPU 环境
+→ 使用方案 C (完整安装)
+
+场景 4: 深度学习训练服务器
+→ 使用方案 B，然后单独安装方案 A
+
+========================================
+故障排除速查
+========================================
+
+问题: nouveau 驱动冲突
+解决: 安装脚本会自动处理，按提示重启
+
+问题: nvidia-smi 无法运行
+解决: sudo reboot 或 sudo modprobe nvidia
+
+问题: Docker 无法使用 GPU
+解决:
+  $ sudo nvidia-ctk runtime configure --runtime=docker
+  $ sudo systemctl restart docker
+
+问题: CUDA 找不到
+解决:
+  $ source /etc/profile.d/cuda.sh
+  或重启终端
+
+问题: 依赖包缺失
+解决: 在联网机器重新运行下载脚本
+
+========================================
+版本配置 (可修改)
+========================================
+
+默认版本:
+- NVIDIA 驱动: 575.51.03
+- CUDA: 12.9
+- Ubuntu: 22.04
+
+修改版本:
+编辑下载脚本开头的版本号配置即可
+
+========================================
+文件说明
+========================================
+
+核心脚本:
+download-packages.sh         方案 A 下载
+install-offline.sh           方案 A 安装
+download-driver-cuda.sh      方案 B 下载
+install-driver-cuda.sh       方案 B 安装
+download-all-packages.sh     方案 C 下载
+install-all-offline.sh       方案 C 安装
+
+工具脚本:
+quick-start.sh               交互式向导
+verify-installation.sh       验证脚本
+
+文档:
+README.md                    完整文档
+QUICKSTART.txt               本文档
+VERSION                      版本信息
+
+========================================
+性能优化提示
+========================================
+
+# 启用 GPU 持久化模式 (减少延迟)
+$ sudo nvidia-smi -pm 1
+
+# 设置性能模式
+$ sudo nvidia-smi -pl 300
+
+# 查看 GPU 利用率
+$ watch -n 1 nvidia-smi
+
+========================================
+Docker Compose 示例
+========================================
+
+version: '3.8'
+services:
+  gpu-app:
+    image: your-image
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+========================================
+参考资料
+========================================
+
+详细文档: README.md
+NVIDIA 驱动: https://www.nvidia.com/Download/index.aspx
+CUDA 文档: https://docs.nvidia.com/cuda/
+Container Toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/
+
+========================================
+支持与反馈
+========================================
+
+遇到问题?
+1. 查看 README.md 故障排除章节
+2. 查看安装日志 /var/log/nvidia-*.log
+3. 运行 ./verify-installation.sh 诊断
+
+========================================
+
+最后更新: 2025-12-17
+适用系统: Ubuntu 22.04 LTS

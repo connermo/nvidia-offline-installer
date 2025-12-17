@@ -1,0 +1,250 @@
+NVIDIA GPU 环境离线安装工具
+========================================
+
+版本信息:
+---------
+工具版本: 2.0.0
+发布日期: 2025-12-17
+维护状态: 活跃维护
+
+系统要求:
+---------
+操作系统: Ubuntu 22.04 LTS (Jammy Jellyfish)
+架构: x86_64 / amd64
+
+支持的安装方案:
+--------------
+方案 A: NVIDIA Container Toolkit (仅)
+  - 前置条件: 驱动和 CUDA 已安装
+  - 下载大小: ~50-100 MB
+  - 安装时间: ~5 分钟
+
+方案 B: NVIDIA 驱动 + CUDA
+  - 驱动版本: 575.51.03
+  - CUDA 版本: 12.9
+  - 下载大小: ~3-5 GB
+  - 安装时间: ~15-30 分钟
+
+方案 C: 完整安装 (驱动 + CUDA + Container Toolkit)
+  - 包含所有组件
+  - 下载大小: ~4-6 GB
+  - 安装时间: ~20-40 分钟
+
+默认配置:
+---------
+NVIDIA 驱动: 575.51.03
+CUDA 版本: 12.9
+Container Toolkit: 最新稳定版
+Docker 支持: 19.03+
+
+包含组件:
+---------
+方案 A 组件:
+  - NVIDIA Container Toolkit
+  - libnvidia-container
+  - libnvidia-container-tools
+  - nvidia-container-toolkit-base
+
+方案 B 组件:
+  - NVIDIA 驱动 575.51.03
+  - CUDA Toolkit 12.9
+  - CUDA 运行时库
+  - CUDA 开发工具 (nvcc 等)
+
+方案 C 组件:
+  - 方案 A + 方案 B 的所有组件
+
+脚本文件:
+---------
+下载脚本:
+  - download-packages.sh         (方案 A)
+  - download-driver-cuda.sh      (方案 B)
+  - download-all-packages.sh     (方案 C)
+
+安装脚本:
+  - install-offline.sh           (方案 A)
+  - install-driver-cuda.sh       (方案 B)
+  - install-all-offline.sh       (方案 C)
+
+工具脚本:
+  - quick-start.sh               (交互式向导)
+  - verify-installation.sh       (安装验证)
+
+更新日志:
+---------
+v2.0.0 (2025-12-17)
+  - 重大更新: 分离驱动/CUDA 和 Container Toolkit 安装
+  - 新增: 驱动+CUDA 离线安装支持 (方案 B)
+  - 新增: 完整安装选项支持 (方案 C)
+  - 新增: 交互式安装向导
+  - 改进: 更详细的安装日志
+  - 改进: 更完善的错误处理
+  - 改进: 支持自定义组件选择
+
+v1.0.0 (2025-12-17)
+  - 初始版本发布
+  - 支持 Container Toolkit 离线安装
+  - 基础的自动化脚本
+
+兼容性:
+-------
+NVIDIA 驱动版本:
+  - 最低: 450.x
+  - 推荐: 525.x+
+  - 默认: 575.51.03
+  - 支持: 所有 Linux x86_64 驱动
+
+CUDA 版本:
+  - 支持: 11.0+
+  - 推荐: 12.0+
+  - 默认: 12.9
+  - 向后兼容: 是
+
+Docker 版本:
+  - 最低: 19.03
+  - 推荐: 20.10+
+  - 支持: Docker CE / Docker EE
+  - Kubernetes: 支持 (需要 device plugin)
+
+GPU 支持:
+  - NVIDIA GeForce 系列
+  - NVIDIA RTX 系列
+  - NVIDIA Quadro 系列
+  - NVIDIA Tesla 系列
+  - NVIDIA A 系列
+
+支持的容器镜像:
+--------------
+- nvidia/cuda:*
+- nvidia/cudagl:*
+- tensorflow/tensorflow:*-gpu
+- pytorch/pytorch:*
+- nvcr.io/* (NVIDIA NGC 容器)
+- 其他基于 CUDA 的镜像
+
+已知限制:
+---------
+1. 仅测试支持 Ubuntu 22.04 (其他版本未验证)
+2. 需要预先安装 Docker (方案 A 和 C)
+3. 驱动安装需要重启系统 (方案 B 和 C)
+4. 离线环境无法拉取测试容器镜像
+5. CUDA 卸载可能影响其他依赖 CUDA 的软件
+
+系统依赖:
+---------
+必需:
+  - build-essential (方案 B/C)
+  - dkms (方案 B/C)
+  - linux-headers-$(uname -r) (方案 B/C)
+  - Docker (方案 A/C)
+
+可选:
+  - git (用于源码编译 CUDA 示例)
+  - cmake (用于构建 CUDA 项目)
+
+安全特性:
+---------
+- SHA256 校验和验证
+- GPG 签名验证
+- 离线安装包支持
+- 无需互联网连接 (安装阶段)
+- 支持内网隔离环境
+
+性能特性:
+---------
+- GPU 持久化模式支持
+- 多 GPU 支持
+- CUDA MPS (Multi-Process Service) 支持
+- Docker 运行时优化
+- 零拷贝内存访问
+
+测试环境:
+---------
+硬件:
+  - NVIDIA RTX 4090
+  - NVIDIA RTX 3090
+  - NVIDIA A100
+  - NVIDIA V100
+
+软件:
+  - Ubuntu 22.04 LTS
+  - Kernel 5.15+
+  - Docker 24.0+
+  - CUDA 12.9
+
+参考文档:
+---------
+- NVIDIA 驱动文档: https://docs.nvidia.com/datacenter/tesla/
+- CUDA 编程指南: https://docs.nvidia.com/cuda/cuda-c-programming-guide/
+- Container Toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/
+- Docker GPU 支持: https://docs.docker.com/config/containers/resource_constraints/#gpu
+
+常见问题:
+---------
+Q: 可以在 Ubuntu 20.04 上使用吗?
+A: 未经测试，但理论上可行。需要修改脚本中的版本号。
+
+Q: 支持 ARM 架构吗?
+A: 当前版本仅支持 x86_64，ARM 支持计划中。
+
+Q: 可以自定义 CUDA 版本吗?
+A: 可以，修改下载脚本开头的版本配置即可。
+
+Q: 安装后可以卸载吗?
+A: 可以，参考 README.md 的卸载章节。
+
+Q: 支持多版本 CUDA 并存吗?
+A: 支持，CUDA 可以安装到不同目录并通过软链接切换。
+
+技术支持:
+---------
+问题反馈: 提交 GitHub Issue
+文档: README.md 和 QUICKSTART.txt
+日志位置: /var/log/nvidia-*.log
+验证工具: ./verify-installation.sh
+
+许可证:
+-------
+工具脚本: MIT License
+NVIDIA 驱动: NVIDIA Software License
+CUDA Toolkit: NVIDIA End User License Agreement
+Container Toolkit: Apache 2.0 License
+
+贡献指南:
+---------
+欢迎贡献! 请确保:
+1. 在 Ubuntu 22.04 上测试
+2. 更新相关文档
+3. 遵循现有代码风格
+4. 提交 Pull Request
+
+路线图:
+-------
+v2.1.0 (计划中)
+  - 支持 Ubuntu 24.04
+  - 支持 ARM64 架构
+  - 支持 Jetson 设备
+  - Docker 离线安装集成
+
+v3.0.0 (计划中)
+  - 支持 Kubernetes 部署
+  - 支持多节点部署
+  - Web 管理界面
+  - 自动版本检测和更新
+
+========================================
+
+联系方式:
+---------
+项目主页: [Your Project URL]
+问题反馈: [Issue Tracker]
+文档更新: 2025-12-17
+
+========================================
+
+⚠️  免责声明:
+本工具提供"按原样"服务，不提供任何明示或暗示的保证。
+使用本工具的风险由用户自行承担。
+请在生产环境使用前充分测试。
+
+========================================

@@ -1,0 +1,22 @@
+# 忽略下载的包
+packages/
+driver-cuda-packages/
+*.deb
+*.run
+
+# 忽略压缩包
+*.tar.gz
+*.zip
+
+# 忽略临时文件
+*.log
+*.tmp
+.DS_Store
+
+# 忽略备份文件
+*.backup
+*.bak
+repo-lists/
+
+# 忽略 GPG 密钥文件
+*.gpg
