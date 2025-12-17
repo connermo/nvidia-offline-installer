@@ -100,8 +100,17 @@ if [ ! -f "$(pwd)/$DOWNLOAD_SCRIPT" ]; then
     exit 1
 fi
 
-# 运行 Docker 容器进行下载
-docker run --rm \
+# 创建日志目录和文件
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_DIR="./download-logs"
+mkdir -p "$LOG_DIR"
+DOCKER_LOG="$LOG_DIR/docker_download_${TIMESTAMP}.log"
+
+echo "日志文件: $DOCKER_LOG"
+echo ""
+
+# 运行 Docker 容器进行下载，捕获所有输出
+if docker run --rm \
     -v "$(pwd):/workspace" \
     -w /workspace \
     -e NVIDIA_DRIVER_VERSION="$NVIDIA_DRIVER_VERSION" \
@@ -109,26 +118,57 @@ docker run --rm \
     -e CUDA_VERSION_FULL="$CUDA_VERSION_FULL" \
     nvidia-offline-downloader:ubuntu22.04 \
     bash -c "
+        # 更新 apt 包索引（重要！避免404错误）
+        echo '========================================'
+        echo '更新 apt 包索引...'
+        echo '========================================'
+        apt-get update || {
+            echo '警告: apt-get update 失败，但继续尝试下载'
+        }
+        echo ''
+
         # 确保脚本可执行
         chmod +x $DOWNLOAD_SCRIPT
 
         # 运行下载脚本（自动跳过交互式提示）
         echo 'y' | bash $DOWNLOAD_SCRIPT || bash $DOWNLOAD_SCRIPT
-    "
+    " 2>&1 | tee "$DOCKER_LOG"; then
+    DOWNLOAD_SUCCESS=true
+else
+    DOWNLOAD_SUCCESS=false
+fi
 
 echo ""
 echo -e "${GREEN}✓${NC} 下载完成"
 echo ""
 
-echo -e "${BLUE}[4/4] 检查下载结果...${NC}"
+echo -e "${BLUE}[4/4] 分析下载结果...${NC}"
 echo ""
+
+# 分析日志中的失败信息
+FAILED_PACKAGES_FILE="$LOG_DIR/failed_packages_${TIMESTAMP}.txt"
+
+# 提取失败的包
+echo "分析下载日志..."
+grep -E "(失败|Failed|Unable to locate|404|E: Package)" "$DOCKER_LOG" 2>/dev/null | \
+    grep -oE "\b[a-z0-9][a-z0-9+._-]+\b" | \
+    grep -v "^E$\|^Package$\|^failed$\|^Failed$" | \
+    sort -u > "$FAILED_PACKAGES_FILE" 2>/dev/null || true
+
+# 统计结果
+SUCCESS_COUNT=$(grep -c "✓\|成功" "$DOCKER_LOG" 2>/dev/null || echo "0")
+FAILED_MENTION=$(grep -c "失败\|失败\|Failed\|failed" "$DOCKER_LOG" 2>/dev/null || echo "0")
 
 # 统计下载的文件
 DRIVER_COUNT=$(find "$DOWNLOAD_DIR/nvidia-driver" -name "*.deb" -o -name "*.run" 2>/dev/null | wc -l)
 CUDA_COUNT=$(find "$DOWNLOAD_DIR/cuda" -name "*.deb" 2>/dev/null | wc -l)
 TOOLKIT_COUNT=$(find "$DOWNLOAD_DIR/container-toolkit" -name "*.deb" 2>/dev/null | wc -l)
 
+echo ""
 echo "下载统计:"
+echo "  成功标记: $SUCCESS_COUNT"
+echo "  失败提及: $FAILED_MENTION"
+echo ""
 echo "  NVIDIA 驱动文件: $DRIVER_COUNT"
 echo "  CUDA 包: $CUDA_COUNT"
 echo "  Container Toolkit 包: $TOOLKIT_COUNT"
@@ -139,15 +179,77 @@ TOTAL_SIZE=$(du -sh "$DOWNLOAD_DIR" | cut -f1)
 echo "总下载大小: $TOTAL_SIZE"
 echo ""
 
+# 分析失败的包
+if [ -s "$FAILED_PACKAGES_FILE" ]; then
+    FAILED_PKG_COUNT=$(wc -l < "$FAILED_PACKAGES_FILE" | tr -d ' ')
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}检测到 $FAILED_PKG_COUNT 个可能失败的包${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+
+    # 分类显示前15个
+    echo "失败包预览（前15个）:"
+    head -15 "$FAILED_PACKAGES_FILE" | while read pkg; do
+        if [[ "$pkg" == *"-doc"* ]] || [[ "$pkg" == *"-examples"* ]]; then
+            echo -e "  ${BLUE}◇${NC} $pkg ${BLUE}(文档/示例 - 可选)${NC}"
+        elif [[ "$pkg" == *"-dev"* ]]; then
+            echo -e "  ${BLUE}◇${NC} $pkg ${BLUE}(开发包 - 编译时需要)${NC}"
+        elif [[ "$pkg" == *"cuda"* ]] || [[ "$pkg" == *"nvidia"* ]]; then
+            echo -e "  ${YELLOW}?${NC} $pkg ${YELLOW}(需要检查)${NC}"
+        elif [[ "$pkg" =~ ^(awk|c-compiler|c-shell|x11-common)$ ]]; then
+            echo -e "  ${GREEN}○${NC} $pkg ${GREEN}(虚拟包 - 可忽略)${NC}"
+        else
+            echo -e "  ${CYAN}·${NC} $pkg"
+        fi
+    done
+
+    if [ $FAILED_PKG_COUNT -gt 15 ]; then
+        echo -e "  ${CYAN}... 还有 $((FAILED_PKG_COUNT - 15)) 个${NC}"
+    fi
+    echo ""
+
+    echo -e "${BLUE}详细分析${NC}:"
+    echo "使用以下命令进行详细分析:"
+    echo -e "  ${CYAN}./analyze-failures.sh $FAILED_PACKAGES_FILE${NC}"
+    echo ""
+
+    # 快速判断是否有关键包失败
+    CRITICAL_COUNT=$(grep -E "nvidia-driver|cuda-toolkit|cuda-runtime|nvidia-container-toolkit|libnvidia" "$FAILED_PACKAGES_FILE" 2>/dev/null | wc -l | tr -d ' ')
+
+    if [ "$CRITICAL_COUNT" -gt 0 ]; then
+        echo -e "${RED}⚠️  警告: 检测到 $CRITICAL_COUNT 个可能的关键包失败！${NC}"
+        echo ""
+        echo "建议操作:"
+        echo "  1. 查看完整日志: cat $DOCKER_LOG"
+        echo "  2. 运行详细分析: ./analyze-failures.sh $FAILED_PACKAGES_FILE"
+        echo "  3. 如确认为关键包，重新构建 Docker 镜像后再试"
+        echo ""
+    else
+        echo -e "${GREEN}✓${NC} 未检测到关键包失败"
+        echo -e "${GREEN}失败的包大多是虚拟包或可选包，可以继续安装${NC}"
+        echo ""
+    fi
+else
+    echo -e "${GREEN}✓ 未检测到明显的失败包${NC}"
+    echo ""
+fi
+
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}下载完成！${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "安装包位置: $DOWNLOAD_DIR"
 echo ""
+echo "日志文件:"
+echo "  完整日志: $DOCKER_LOG"
+if [ -s "$FAILED_PACKAGES_FILE" ]; then
+    echo "  失败包列表: $FAILED_PACKAGES_FILE"
+fi
+echo ""
 echo "后续步骤:"
-echo "1. 将 packages 目录复制到目标机器"
-echo "2. 根据场景选择对应的安装脚本:"
+echo "1. 如有失败包，运行分析: ./analyze-failures.sh $FAILED_PACKAGES_FILE"
+echo "2. 将 packages 目录复制到目标机器"
+echo "3. 根据场景选择对应的安装脚本:"
 echo "   - 场景 A: ./install-offline.sh"
 echo "   - 场景 B: ./install-driver-cuda.sh"
 echo "   - 场景 C: ./install-all-offline.sh"
