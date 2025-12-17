@@ -24,19 +24,6 @@ echo ""
 echo -e "${CYAN}支持组件: 驱动 + CUDA + Container Toolkit${NC}"
 echo ""
 
-# 检查网络连接
-echo -e "${BLUE}检查网络连接...${NC}"
-if ! ping -c 1 google.com &> /dev/null && ! ping -c 1 baidu.com &> /dev/null; then
-    echo -e "${RED}错误: 无法连接到互联网${NC}"
-    echo "此脚本需要在联网环境下运行以下载安装包"
-    echo ""
-    echo "如果你已经下载了安装包,请直接运行:"
-    echo "  sudo ./install-all-offline.sh"
-    exit 1
-fi
-echo -e "${GREEN}✓${NC} 网络连接正常"
-echo ""
-
 # 检查是否为 root
 if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}错误: 需要 root 权限${NC}"

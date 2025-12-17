@@ -47,15 +47,6 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# 检查网络连接
-echo -e "${BLUE}检查网络连接...${NC}"
-if ! ping -c 1 google.com &> /dev/null && ! ping -c 1 baidu.com &> /dev/null; then
-    echo -e "${RED}错误: 无法连接到互联网${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓${NC} 网络连接正常"
-echo ""
-
 # 创建目录结构
 echo -e "${YELLOW}[1/7] 创建目录结构...${NC}"
 mkdir -p "$DRIVER_DIR"
