@@ -65,38 +65,71 @@ else
     exit 1
 fi
 
-# 驱动下载 URL
-DRIVER_BASE_URL="https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_DRIVER_VERSION}"
+# 驱动下载 URL - 多个镜像源
 DRIVER_FILENAME="NVIDIA-Linux-x86_64-${NVIDIA_DRIVER_VERSION}.run"
+DRIVER_URLS=(
+    "https://us.download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_DRIVER_VERSION}/${DRIVER_FILENAME}"
+    "https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_DRIVER_VERSION}/${DRIVER_FILENAME}"
+    "https://cn.download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_DRIVER_VERSION}/${DRIVER_FILENAME}"
+)
 
 echo "下载驱动安装包: $DRIVER_FILENAME"
 cd "$DRIVER_DIR"
 
 if [ ! -f "$DRIVER_FILENAME" ]; then
-    wget -q --show-progress "${DRIVER_BASE_URL}/${DRIVER_FILENAME}" || {
-        echo -e "${RED}错误: 驱动下载失败${NC}"
-        echo "尝试的 URL: ${DRIVER_BASE_URL}/${DRIVER_FILENAME}"
+    DOWNLOAD_SUCCESS=false
+
+    # 尝试所有下载源
+    for url in "${DRIVER_URLS[@]}"; do
+        echo "尝试下载: $url"
+        if wget -q --show-progress --timeout=30 "$url"; then
+            echo -e "${GREEN}✓${NC} 驱动下载成功"
+            DOWNLOAD_SUCCESS=true
+            break
+        else
+            echo -e "${YELLOW}⚠${NC} 此下载源失败，尝试下一个..."
+        fi
+    done
+
+    # 如果所有源都失败
+    if [ "$DOWNLOAD_SUCCESS" = false ]; then
         echo ""
-        echo -e "${YELLOW}提示: 请访问以下网址手动下载驱动:${NC}"
-        echo "https://www.nvidia.com/Download/index.aspx"
-        echo "然后将文件放置到: $DRIVER_DIR/"
-        cd - > /dev/null
+        echo -e "${RED}错误: 所有下载源均失败${NC}"
         echo ""
-        read -p "是否已手动下载驱动到 $DRIVER_DIR/? (y/N): " -n 1 -r
+        echo -e "${YELLOW}请手动下载驱动:${NC}"
+        echo ""
+        echo "方法 1: 从 NVIDIA 官网下载"
+        echo "  访问: https://www.nvidia.com/Download/index.aspx"
+        echo "  或直接: https://www.nvidia.com/download/driverResults.aspx/$(echo $NVIDIA_DRIVER_VERSION | sed 's/\.//g')/en-us"
+        echo ""
+        echo "方法 2: 尝试以下直接链接"
+        for url in "${DRIVER_URLS[@]}"; do
+            echo "  $url"
+        done
+        echo ""
+        echo "下载后将文件放置到: $(pwd)/"
+        echo "文件名必须是: $DRIVER_FILENAME"
+        echo ""
+
+        read -p "是否已手动下载驱动? (y/N): " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo "跳过驱动下载..."
+            echo "跳过驱动下载，继续其他组件..."
+            cd - > /dev/null
         else
-            cd "$DRIVER_DIR"
             if [ ! -f "$DRIVER_FILENAME" ]; then
-                echo -e "${RED}错误: 未找到驱动文件${NC}"
+                echo -e "${RED}错误: 未找到驱动文件 $DRIVER_FILENAME${NC}"
+                echo "当前目录: $(pwd)"
+                echo "请确保文件名完全匹配"
+                cd - > /dev/null
                 exit 1
             fi
         fi
-    }
+    fi
+
     chmod +x "$DRIVER_FILENAME" 2>/dev/null || true
 else
-    echo "驱动已存在，跳过下载"
+    echo -e "${GREEN}✓${NC} 驱动已存在，跳过下载"
 fi
 
 cd - > /dev/null
