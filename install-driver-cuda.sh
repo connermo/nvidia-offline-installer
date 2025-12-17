@@ -16,10 +16,9 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# 目录配置
-BASE_DIR="./driver-cuda-packages"
-DRIVER_DIR="$BASE_DIR/nvidia-driver"
-CUDA_DIR="$BASE_DIR/cuda"
+# 目录配置 - 统一使用 packages/ 目录
+BASE_DIR="./packages"
+PACKAGES_DIR="$BASE_DIR"  # 所有包都在统一目录
 CONFIG_FILE="$BASE_DIR/install-config.conf"
 LOG_FILE="/var/log/nvidia-driver-cuda-install.log"
 
@@ -118,7 +117,7 @@ if [ ! -d "$HEADERS_DIR" ]; then
     echo ""
 
     # 检查离线包中是否有对应的 linux-headers
-    if ls "$DRIVER_DIR"/linux-headers-${KERNEL_VERSION}*.deb 1> /dev/null 2>&1; then
+    if ls "$PACKAGES_DIR"/linux-headers-${KERNEL_VERSION}*.deb 1> /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} 在离线包中找到对应的内核头文件"
         echo "将在安装依赖时自动安装"
     else
@@ -179,12 +178,12 @@ echo ""
 echo -e "${CYAN}[2/8] 安装驱动依赖包${NC}"
 echo ""
 
-if [ ! -d "$DRIVER_DIR" ]; then
-    echo -e "${RED}错误: 找不到驱动目录 '$DRIVER_DIR'${NC}"
+if [ ! -d "$PACKAGES_DIR" ]; then
+    echo -e "${RED}错误: 找不到驱动目录 '$PACKAGES_DIR'${NC}"
     exit 1
 fi
 
-cd "$DRIVER_DIR"
+cd "$PACKAGES_DIR"
 
 if ls *.deb 1> /dev/null 2>&1; then
     echo "安装依赖包..."
@@ -206,7 +205,7 @@ echo ""
 echo -e "${CYAN}[3/8] 安装 NVIDIA 驱动${NC}"
 echo ""
 
-cd "$DRIVER_DIR"
+cd "$PACKAGES_DIR"
 
 # 查找驱动安装包
 DRIVER_INSTALLER=$(ls NVIDIA-Linux-*.run 2>/dev/null | head -1)
@@ -271,12 +270,12 @@ echo ""
 echo -e "${CYAN}[4/8] 安装 CUDA Toolkit${NC}"
 echo ""
 
-if [ ! -d "$CUDA_DIR" ]; then
-    echo -e "${RED}错误: 找不到 CUDA 目录 '$CUDA_DIR'${NC}"
+if [ ! -d "$PACKAGES_DIR" ]; then
+    echo -e "${RED}错误: 找不到 CUDA 目录 '$PACKAGES_DIR'${NC}"
     exit 1
 fi
 
-cd "$CUDA_DIR"
+cd "$PACKAGES_DIR"
 
 # 检查包数量
 CUDA_PKG_COUNT=$(ls -1 *.deb 2>/dev/null | wc -l)

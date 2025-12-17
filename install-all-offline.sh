@@ -22,11 +22,9 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# 目录配置
+# 目录配置 - 统一使用 packages/ 目录
 BASE_DIR="./packages"
-DRIVER_DIR="$BASE_DIR/nvidia-driver"
-CUDA_DIR="$BASE_DIR/cuda"
-TOOLKIT_DIR="$BASE_DIR/container-toolkit"
+PACKAGES_DIR="$BASE_DIR"  # 所有包都在统一目录
 CONFIG_FILE="$BASE_DIR/install-config.conf"
 LOG_FILE="/var/log/nvidia-offline-install.log"
 
@@ -197,12 +195,12 @@ if $INSTALL_DRIVER; then
     echo -e "${CYAN}========================================${NC}"
     echo ""
 
-    if [ ! -d "$DRIVER_DIR" ]; then
-        echo -e "${RED}错误: 找不到驱动目录 '$DRIVER_DIR'${NC}"
+    if [ ! -d "$PACKAGES_DIR" ]; then
+        echo -e "${RED}错误: 找不到驱动目录 '$PACKAGES_DIR'${NC}"
         exit 1
     fi
 
-    cd "$DRIVER_DIR"
+    cd "$PACKAGES_DIR"
 
     # 安装依赖
     echo "安装驱动依赖包..."
@@ -269,12 +267,12 @@ if $INSTALL_CUDA; then
         exit 1
     fi
 
-    if [ ! -d "$CUDA_DIR" ]; then
-        echo -e "${RED}错误: 找不到 CUDA 目录 '$CUDA_DIR'${NC}"
+    if [ ! -d "$PACKAGES_DIR" ]; then
+        echo -e "${RED}错误: 找不到 CUDA 目录 '$PACKAGES_DIR'${NC}"
         exit 1
     fi
 
-    cd "$CUDA_DIR"
+    cd "$PACKAGES_DIR"
 
     # 验证包完整性
     if [ -f SHA256SUMS ]; then
@@ -367,12 +365,12 @@ if $INSTALL_TOOLKIT; then
     echo -e "${CYAN}========================================${NC}"
     echo ""
 
-    if [ ! -d "$TOOLKIT_DIR" ]; then
-        echo -e "${RED}错误: 找不到 Container Toolkit 目录 '$TOOLKIT_DIR'${NC}"
+    if [ ! -d "$PACKAGES_DIR" ]; then
+        echo -e "${RED}错误: 找不到 Container Toolkit 目录 '$PACKAGES_DIR'${NC}"
         exit 1
     fi
 
-    cd "$TOOLKIT_DIR"
+    cd "$PACKAGES_DIR"
 
     # 验证包完整性
     if [ -f SHA256SUMS ]; then
