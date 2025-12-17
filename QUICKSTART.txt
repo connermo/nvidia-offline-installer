@@ -160,7 +160,7 @@ $ sudo ./verify-installation.sh
 ========================================
 
 默认版本:
-- NVIDIA 驱动: 575.51.03
+- NVIDIA 驱动: 550.127.05 (Production Branch)
 - CUDA: 12.9
 - Ubuntu: 22.04
 

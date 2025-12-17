@@ -18,7 +18,7 @@
 
 - 下载脚本: `download-driver-cuda.sh`
 - 安装脚本: `install-driver-cuda.sh`
-- 包含: NVIDIA 驱动 575.51.03 + CUDA 12.9
+- 包含: NVIDIA 驱动 550.127.05 + CUDA 12.9
 
 ### 方案 C: 完整安装 ⭐⭐⭐
 **适用场景**: 一次性安装所有组件
@@ -99,7 +99,7 @@ sudo ./download-driver-cuda.sh
 ```
 
 下载包含:
-- NVIDIA 驱动 575.51.03
+- NVIDIA 驱动 550.127.05 (Production Branch)
 - CUDA Toolkit 12.9
 - 所有依赖包
 

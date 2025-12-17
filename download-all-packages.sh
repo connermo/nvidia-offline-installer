@@ -17,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 配置 - 可根据需要修改
-NVIDIA_DRIVER_VERSION="575.51.03"
+NVIDIA_DRIVER_VERSION="550.127.05"
 CUDA_VERSION="12.9"
 CUDA_VERSION_FULL="12-9"  # 用于包名
 UBUNTU_VERSION="22.04"
@@ -70,46 +70,31 @@ else
     exit 1
 fi
 
-# 驱动下载 URL - 多个镜像源
+# 驱动下载 URL
 DRIVER_FILENAME="NVIDIA-Linux-x86_64-${NVIDIA_DRIVER_VERSION}.run"
-DRIVER_URLS=(
-    "https://us.download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_DRIVER_VERSION}/${DRIVER_FILENAME}"
-    "https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_DRIVER_VERSION}/${DRIVER_FILENAME}"
-    "https://cn.download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_DRIVER_VERSION}/${DRIVER_FILENAME}"
-)
+DRIVER_URL="https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_DRIVER_VERSION}/${DRIVER_FILENAME}"
 
 echo "下载驱动安装包: $DRIVER_FILENAME"
+echo "下载地址: $DRIVER_URL"
 cd "$DRIVER_DIR"
 
 if [ ! -f "$DRIVER_FILENAME" ]; then
-    DOWNLOAD_SUCCESS=false
-
-    # 尝试所有下载源
-    for url in "${DRIVER_URLS[@]}"; do
-        echo "尝试下载: $url"
-        if wget -q --show-progress --timeout=30 "$url"; then
-            echo -e "${GREEN}✓${NC} 驱动下载成功"
-            DOWNLOAD_SUCCESS=true
-            break
-        else
-            echo -e "${YELLOW}⚠${NC} 此下载源失败，尝试下一个..."
-        fi
-    done
-
-    # 如果所有源都失败
-    if [ "$DOWNLOAD_SUCCESS" = false ]; then
+    echo "开始下载..."
+    if wget --show-progress --timeout=60 "$DRIVER_URL"; then
+        echo -e "${GREEN}✓${NC} 驱动下载成功"
+        chmod +x "$DRIVER_FILENAME"
+    else
         echo ""
-        echo -e "${RED}错误: 所有下载源均失败${NC}"
+        echo -e "${RED}错误: 驱动下载失败${NC}"
         echo ""
-        echo -e "${YELLOW}请手动下载驱动:${NC}"
+        echo -e "${YELLOW}手动下载选项:${NC}"
         echo ""
-        echo "方法 1: 从 NVIDIA 官网下载"
+        echo "方法 1: 使用浏览器下载"
+        echo "  URL: $DRIVER_URL"
+        echo ""
+        echo "方法 2: 从 NVIDIA 官网下载"
         echo "  访问: https://www.nvidia.com/Download/index.aspx"
-        echo ""
-        echo "方法 2: 尝试以下直接链接"
-        for url in "${DRIVER_URLS[@]}"; do
-            echo "  $url"
-        done
+        echo "  选择对应的产品和版本 $NVIDIA_DRIVER_VERSION"
         echo ""
         echo "下载后将文件放置到: $(pwd)/"
         echo "文件名必须是: $DRIVER_FILENAME"
@@ -122,14 +107,12 @@ if [ ! -f "$DRIVER_FILENAME" ]; then
         else
             if [ ! -f "$DRIVER_FILENAME" ]; then
                 echo -e "${RED}错误: 未找到驱动文件 $DRIVER_FILENAME${NC}"
-                echo "当前目录: $(pwd)"
                 cd - > /dev/null
                 exit 1
             fi
+            chmod +x "$DRIVER_FILENAME"
         fi
     fi
-
-    chmod +x "$DRIVER_FILENAME" 2>/dev/null || true
 else
     echo -e "${GREEN}✓${NC} 驱动已存在，跳过下载"
 fi

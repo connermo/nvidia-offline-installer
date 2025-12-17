@@ -20,7 +20,7 @@ NVIDIA GPU 环境离线安装工具
   - 安装时间: ~5 分钟
 
 方案 B: NVIDIA 驱动 + CUDA
-  - 驱动版本: 575.51.03
+  - 驱动版本: 550.127.05 (Production Branch)
   - CUDA 版本: 12.9
   - 下载大小: ~3-5 GB
   - 安装时间: ~15-30 分钟
@@ -32,7 +32,7 @@ NVIDIA GPU 环境离线安装工具
 
 默认配置:
 ---------
-NVIDIA 驱动: 575.51.03
+NVIDIA 驱动: 550.127.05 (Production Branch)
 CUDA 版本: 12.9
 Container Toolkit: 最新稳定版
 Docker 支持: 19.03+
@@ -46,7 +46,7 @@ Docker 支持: 19.03+
   - nvidia-container-toolkit-base
 
 方案 B 组件:
-  - NVIDIA 驱动 575.51.03
+  - NVIDIA 驱动 550.127.05 (Production Branch)
   - CUDA Toolkit 12.9
   - CUDA 运行时库
   - CUDA 开发工具 (nvcc 等)
@@ -90,8 +90,8 @@ v1.0.0 (2025-12-17)
 -------
 NVIDIA 驱动版本:
   - 最低: 450.x
-  - 推荐: 525.x+
-  - 默认: 575.51.03
+  - 推荐: 550.x+ (Production Branch)
+  - 默认: 550.127.05
   - 支持: 所有 Linux x86_64 驱动
 
 CUDA 版本:
