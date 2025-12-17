@@ -13,6 +13,9 @@ driver-cuda-packages/
 *.tmp
 .DS_Store
 
+# 忽略下载日志目录
+download-logs/
+
 # 忽略备份文件
 *.backup
 *.bak
