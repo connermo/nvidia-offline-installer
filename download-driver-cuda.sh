@@ -332,14 +332,36 @@ echo "下载驱动依赖包..."
 cd "$DRIVER_DIR"
 apt-get update > /dev/null 2>&1
 
-# 基础依赖
-DRIVER_DEPS="build-essential dkms pkg-config libglvnd-dev linux-headers-$(uname -r)"
+# 检查目标内核版本
+if [ -z "$TARGET_KERNEL_VERSION" ]; then
+    echo ""
+    echo -e "${YELLOW}注意: 内核头文件版本问题${NC}"
+    echo ""
+    echo "linux-headers 必须与目标机器的内核版本完全匹配"
+    echo "当前环境内核: $(uname -r)"
+    echo ""
+    read -p "目标机器内核版本（留空跳过 linux-headers）: " TARGET_KERNEL_VERSION
+    echo ""
+fi
+
+# 基础依赖（不含内核头文件）
+DRIVER_DEPS="build-essential dkms pkg-config libglvnd-dev"
+
+# 如果指定了目标内核版本，添加 linux-headers
+if [ ! -z "$TARGET_KERNEL_VERSION" ]; then
+    echo "将下载内核版本 $TARGET_KERNEL_VERSION 的头文件"
+    DRIVER_DEPS="$DRIVER_DEPS linux-headers-$TARGET_KERNEL_VERSION"
+else
+    echo -e "${YELLOW}跳过 linux-headers 下载${NC}"
+    echo "安装时需要在目标机器上运行: sudo apt-get install linux-headers-\$(uname -r)"
+fi
+
 download_packages_batch "$DRIVER_DEPS" "驱动基础依赖"
 
 echo ""
 echo "下载二级依赖..."
-# 下载常见依赖的依赖
-for dep in $DRIVER_DEPS; do
+# 下载常见依赖的依赖（排除 linux-headers，因为它有内核版本依赖）
+for dep in build-essential dkms pkg-config libglvnd-dev; do
     SUBDEPS=$(apt-cache depends $dep 2>/dev/null | grep "Depends:" | awk '{print $2}' | tr '\n' ' ')
     if [ ! -z "$SUBDEPS" ]; then
         download_packages_batch "$SUBDEPS" "$dep 的依赖"

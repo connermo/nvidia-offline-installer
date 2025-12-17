@@ -62,6 +62,8 @@ read -p "请选择 [1-3]: " choice
 echo ""
 
 DOWNLOAD_SCRIPT=""
+TARGET_KERNEL_VERSION=""
+
 case $choice in
     1)
         echo -e "${BLUE}场景 A: 仅下载 Container Toolkit${NC}"
@@ -70,10 +72,26 @@ case $choice in
     2)
         echo -e "${BLUE}场景 B: 下载驱动 + CUDA${NC}"
         DOWNLOAD_SCRIPT="download-driver-cuda.sh"
+
+        # 询问目标内核版本
+        echo ""
+        echo -e "${YELLOW}注意: linux-headers 必须与目标机器的内核版本完全匹配${NC}"
+        echo "如果不确定，可以留空，稍后在目标机器上安装"
+        echo ""
+        read -p "目标机器内核版本（如 6.8.0-31-generic，留空跳过）: " TARGET_KERNEL_VERSION
+        echo ""
         ;;
     3)
         echo -e "${BLUE}场景 C: 下载所有组件${NC}"
         DOWNLOAD_SCRIPT="download-all-packages.sh"
+
+        # 询问目标内核版本
+        echo ""
+        echo -e "${YELLOW}注意: linux-headers 必须与目标机器的内核版本完全匹配${NC}"
+        echo "如果不确定，可以留空，稍后在目标机器上安装"
+        echo ""
+        read -p "目标机器内核版本（如 6.8.0-31-generic，留空跳过）: " TARGET_KERNEL_VERSION
+        echo ""
         ;;
     *)
         echo -e "${RED}无效选择${NC}"
@@ -116,6 +134,7 @@ if docker run --rm \
     -e NVIDIA_DRIVER_VERSION="$NVIDIA_DRIVER_VERSION" \
     -e CUDA_VERSION="$CUDA_VERSION" \
     -e CUDA_VERSION_FULL="$CUDA_VERSION_FULL" \
+    -e TARGET_KERNEL_VERSION="$TARGET_KERNEL_VERSION" \
     nvidia-offline-downloader:ubuntu22.04 \
     bash -c "
         # 更新 apt 包索引（重要！避免404错误）
@@ -131,7 +150,8 @@ if docker run --rm \
         chmod +x $DOWNLOAD_SCRIPT
 
         # 运行下载脚本（自动跳过交互式提示）
-        echo 'y' | bash $DOWNLOAD_SCRIPT || bash $DOWNLOAD_SCRIPT
+        # 传递空字符串到脚本以跳过交互式提示
+        echo '' | bash $DOWNLOAD_SCRIPT || bash $DOWNLOAD_SCRIPT
     " 2>&1 | tee "$DOCKER_LOG"; then
     DOWNLOAD_SUCCESS=true
 else
