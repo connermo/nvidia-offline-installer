@@ -270,13 +270,92 @@ if [ -s "$FAILED_PACKAGES_FILE" ]; then
     echo "  失败包列表: $FAILED_PACKAGES_FILE"
 fi
 echo ""
-echo "后续步骤:"
-echo "1. 如有失败包，运行分析: ./analyze-failures.sh $FAILED_PACKAGES_FILE"
-echo "2. 将 packages 目录复制到目标机器"
-echo "3. 根据场景选择对应的安装脚本:"
-echo "   - 场景 A: ./install-offline.sh"
-echo "   - 场景 B: ./install-driver-cuda.sh"
-echo "   - 场景 C: ./install-all-offline.sh"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}后续步骤指引${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+# 根据场景选择对应的安装脚本
+case $choice in
+    1)
+        INSTALL_SCRIPT="install-offline.sh"
+        SCENARIO_NAME="Container Toolkit"
+        ;;
+    2)
+        INSTALL_SCRIPT="install-driver-cuda.sh"
+        SCENARIO_NAME="驱动 + CUDA"
+        ;;
+    3)
+        INSTALL_SCRIPT="install-all-offline.sh"
+        SCENARIO_NAME="完整安装"
+        ;;
+    *)
+        INSTALL_SCRIPT="install-*.sh"
+        SCENARIO_NAME="对应场景"
+        ;;
+esac
+
+echo -e "${CYAN}步骤 1: 打包压缩${NC}"
+echo "在当前机器上执行:"
+echo ""
+echo -e "  ${GREEN}tar -czf nvidia-offline-$(date +%Y%m%d).tar.gz packages/ $INSTALL_SCRIPT${NC}"
+echo ""
+echo "压缩后的文件: nvidia-offline-$(date +%Y%m%d).tar.gz"
+echo ""
+
+echo -e "${CYAN}步骤 2: 传输到目标机器${NC}"
+echo "使用以下方式之一传输压缩包:"
+echo ""
+echo "  方式 1 - SCP:"
+echo -e "    ${GREEN}scp nvidia-offline-$(date +%Y%m%d).tar.gz user@target-host:/tmp/${NC}"
+echo ""
+echo "  方式 2 - SFTP/FTP"
+echo ""
+echo "  方式 3 - USB 设备或其他物理媒介"
+echo ""
+
+echo -e "${CYAN}步骤 3: 在目标机器上解压${NC}"
+echo "在目标机器上执行:"
+echo ""
+echo -e "  ${GREEN}cd /tmp${NC}"
+echo -e "  ${GREEN}tar -xzf nvidia-offline-$(date +%Y%m%d).tar.gz${NC}"
+echo ""
+
+echo -e "${CYAN}步骤 4: 运行安装脚本${NC}"
+echo "在目标机器上执行:"
+echo ""
+echo -e "  ${GREEN}cd /tmp${NC}"
+echo -e "  ${GREEN}chmod +x $INSTALL_SCRIPT${NC}"
+echo -e "  ${GREEN}sudo ./$INSTALL_SCRIPT${NC}"
+echo ""
+
+echo -e "${CYAN}步骤 5: 验证安装${NC}"
+case $choice in
+    1)
+        echo "Container Toolkit 安装后验证:"
+        echo -e "  ${GREEN}docker run --rm --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi${NC}"
+        ;;
+    2)
+        echo "驱动 + CUDA 安装后验证 (需重启):"
+        echo -e "  ${GREEN}nvidia-smi${NC}"
+        echo -e "  ${GREEN}nvcc --version${NC}"
+        ;;
+    3)
+        echo "完整安装后验证 (需重启):"
+        echo -e "  ${GREEN}nvidia-smi${NC}"
+        echo -e "  ${GREEN}nvcc --version${NC}"
+        echo -e "  ${GREEN}docker run --rm --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi${NC}"
+        ;;
+esac
+echo ""
+
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}提示${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo "• 如有失败包，先运行: ./analyze-failures.sh"
+echo "• 安装驱动和 CUDA 后需要重启系统"
+echo "• 可以将上述命令保存到脚本中方便执行"
 echo ""
 
 # 询问是否在容器中验证

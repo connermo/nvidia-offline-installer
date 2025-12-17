@@ -543,9 +543,8 @@ echo -e "${GREEN}✓${NC} 配置文件已生成"
 echo ""
 
 # 统计信息
-DRIVER_COUNT=$(ls -1 "$DRIVER_DIR"/*.run 2>/dev/null | wc -l)
-DRIVER_DEB_COUNT=$(ls -1 "$DRIVER_DIR"/*.deb 2>/dev/null | wc -l)
-CUDA_COUNT=$(ls -1 "$CUDA_DIR"/*.deb 2>/dev/null | wc -l)
+RUN_COUNT=$(ls -1 "$PACKAGES_DIR"/*.run 2>/dev/null | wc -l)
+DEB_COUNT=$(ls -1 "$PACKAGES_DIR"/*.deb 2>/dev/null | wc -l)
 TOTAL_SIZE=$(du -sh "$BASE_DIR" | cut -f1)
 
 echo -e "${GREEN}========================================${NC}"
@@ -553,23 +552,47 @@ echo -e "${GREEN}下载完成！${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}下载统计:${NC}"
-echo "  驱动安装包: $DRIVER_COUNT 个 .run 文件"
-echo "  驱动依赖包: $DRIVER_DEB_COUNT 个 .deb 文件"
-echo "  CUDA 包: $CUDA_COUNT 个 .deb 文件"
+echo "  .run 文件: $RUN_COUNT 个"
+echo "  .deb 包: $DEB_COUNT 个"
 echo "  总大小: $TOTAL_SIZE"
 echo ""
 echo -e "${BLUE}下载位置:${NC}"
-echo "  $BASE_DIR/"
-echo "  ├── nvidia-driver/  (驱动文件)"
-echo "  └── cuda/           (CUDA 包)"
+echo "  $BASE_DIR/ (所有包统一存放)"
 echo ""
-echo -e "${YELLOW}下一步操作:${NC}"
-echo "1. 打包所有文件:"
-echo "   tar -czf nvidia-driver-cuda-offline.tar.gz driver-cuda-packages/ install-driver-cuda.sh"
+
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}后续步骤指引${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "2. 将压缩包传输到目标离线服务器"
+
+echo -e "${CYAN}步骤 1: 打包压缩${NC}"
+echo "在当前机器上执行:"
 echo ""
-echo "3. 在目标服务器上解压并安装:"
-echo "   tar -xzf nvidia-driver-cuda-offline.tar.gz"
-echo "   sudo ./install-driver-cuda.sh"
+echo -e "  ${GREEN}tar -czf nvidia-driver-cuda-$(date +%Y%m%d).tar.gz packages/ install-driver-cuda.sh${NC}"
+echo ""
+
+echo -e "${CYAN}步骤 2: 传输到目标机器${NC}"
+echo "使用 SCP 或其他方式传输:"
+echo ""
+echo -e "  ${GREEN}scp nvidia-driver-cuda-$(date +%Y%m%d).tar.gz user@target-host:/tmp/${NC}"
+echo ""
+
+echo -e "${CYAN}步骤 3: 在目标机器上解压并安装${NC}"
+echo ""
+echo -e "  ${GREEN}cd /tmp${NC}"
+echo -e "  ${GREEN}tar -xzf nvidia-driver-cuda-$(date +%Y%m%d).tar.gz${NC}"
+echo -e "  ${GREEN}chmod +x install-driver-cuda.sh${NC}"
+echo -e "  ${GREEN}sudo ./install-driver-cuda.sh${NC}"
+echo ""
+
+echo -e "${CYAN}步骤 4: 重启并验证${NC}"
+echo ""
+echo -e "  ${GREEN}sudo reboot${NC}"
+echo ""
+echo "  重启后执行:"
+echo -e "  ${GREEN}nvidia-smi${NC}"
+echo -e "  ${GREEN}nvcc --version${NC}"
+echo ""
+
+echo -e "${BLUE}提示: 驱动和 CUDA 安装后必须重启系统${NC}"
 echo ""
