@@ -82,18 +82,39 @@ download_packages_batch() {
     local max_parallel="${3:-10}"  # 默认10个并发
     local failed_packages=()
     local success_packages=()
+    local skipped_packages=()
 
     echo "并行下载: $description (并发数: $max_parallel)"
 
     # 创建临时目录存储下载结果
     local temp_dir=$(mktemp -d)
 
-    # 将包列表转换为数组
-    local pkg_array=($package_list)
+    # 将包列表转换为数组并过滤虚拟包
+    local pkg_array=()
+    echo "检查包的有效性..."
+    for pkg in $package_list; do
+        # 使用 apt-cache show 检查包是否真实存在
+        if apt-cache show "$pkg" > /dev/null 2>&1; then
+            pkg_array+=("$pkg")
+        else
+            echo -e "  ${YELLOW}跳过虚拟包:${NC} $pkg"
+            skipped_packages+=("$pkg")
+        fi
+    done
+
     local total=${#pkg_array[@]}
     local current=0
 
-    echo "总包数: $total"
+    if [ $total -eq 0 ]; then
+        echo -e "${YELLOW}没有需要下载的包${NC}"
+        rm -rf "$temp_dir"
+        return
+    fi
+
+    echo "实际需要下载: $total 个包"
+    if [ ${#skipped_packages[@]} -gt 0 ]; then
+        echo "跳过虚拟包: ${#skipped_packages[@]} 个"
+    fi
     echo ""
 
     # 并行下载
