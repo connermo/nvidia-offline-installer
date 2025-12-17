@@ -202,11 +202,12 @@ CUDA_VERSION_FULL="12-9"  # 用于包名
 UBUNTU_VERSION="22.04"
 UBUNTU_CODENAME="jammy"
 
-# 目录配置
+# 目录配置 - 统一使用 packages/ 目录，避免重复
 BASE_DIR="./packages"
-DRIVER_DIR="$BASE_DIR/nvidia-driver"
-CUDA_DIR="$BASE_DIR/cuda"
-TOOLKIT_DIR="$BASE_DIR/container-toolkit"
+DOWNLOAD_DIR="$BASE_DIR"
+DRIVER_DIR="$BASE_DIR"    # 驱动和依赖下载到 packages/
+CUDA_DIR="$BASE_DIR"      # CUDA 也下载到 packages/
+TOOLKIT_DIR="$BASE_DIR"   # Container Toolkit 也下载到 packages/，实现自动去重
 REPO_LIST_DIR="./repo-lists"
 
 echo -e "${GREEN}========================================${NC}"
@@ -228,9 +229,7 @@ fi
 
 # 创建目录结构
 echo -e "${YELLOW}[1/7] 创建目录结构...${NC}"
-mkdir -p "$DRIVER_DIR"
-mkdir -p "$CUDA_DIR"
-mkdir -p "$TOOLKIT_DIR"
+mkdir -p "$BASE_DIR"
 mkdir -p "$REPO_LIST_DIR"
 echo -e "${GREEN}✓${NC} 目录创建完成"
 echo ""

@@ -48,8 +48,8 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 echo -e "${BLUE}[1/4] 创建下载目录...${NC}"
-mkdir -p "$DOWNLOAD_DIR"/{nvidia-driver,cuda,container-toolkit}
-echo -e "${GREEN}✓${NC} 目录已创建"
+mkdir -p "$DOWNLOAD_DIR"
+echo -e "${GREEN}✓${NC} 目录已创建: $DOWNLOAD_DIR (所有包统一下载到此目录)"
 echo ""
 
 # 选择下载场景
@@ -179,19 +179,18 @@ grep -E "(失败|Failed|Unable to locate|404|E: Package)" "$DOCKER_LOG" 2>/dev/n
 SUCCESS_COUNT=$(grep -c "✓\|成功" "$DOCKER_LOG" 2>/dev/null || echo "0")
 FAILED_MENTION=$(grep -c "失败\|失败\|Failed\|failed" "$DOCKER_LOG" 2>/dev/null || echo "0")
 
-# 统计下载的文件
-DRIVER_COUNT=$(find "$DOWNLOAD_DIR/nvidia-driver" -name "*.deb" -o -name "*.run" 2>/dev/null | wc -l)
-CUDA_COUNT=$(find "$DOWNLOAD_DIR/cuda" -name "*.deb" 2>/dev/null | wc -l)
-TOOLKIT_COUNT=$(find "$DOWNLOAD_DIR/container-toolkit" -name "*.deb" 2>/dev/null | wc -l)
+# 统计下载的文件（统一目录）
+TOTAL_DEB_COUNT=$(find "$DOWNLOAD_DIR" -maxdepth 1 -name "*.deb" 2>/dev/null | wc -l | tr -d ' ')
+TOTAL_RUN_COUNT=$(find "$DOWNLOAD_DIR" -maxdepth 1 -name "*.run" 2>/dev/null | wc -l | tr -d ' ')
 
 echo ""
 echo "下载统计:"
 echo "  成功标记: $SUCCESS_COUNT"
 echo "  失败提及: $FAILED_MENTION"
 echo ""
-echo "  NVIDIA 驱动文件: $DRIVER_COUNT"
-echo "  CUDA 包: $CUDA_COUNT"
-echo "  Container Toolkit 包: $TOOLKIT_COUNT"
+echo "  .deb 包数量: $TOTAL_DEB_COUNT"
+echo "  .run 文件数量: $TOTAL_RUN_COUNT"
+echo "  总文件数: $((TOTAL_DEB_COUNT + TOTAL_RUN_COUNT))"
 echo ""
 
 # 计算总大小
@@ -260,6 +259,11 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "安装包位置: $DOWNLOAD_DIR"
 echo ""
+echo -e "${CYAN}说明:${NC}"
+echo "  所有下载的包都统一保存在 packages/ 目录中"
+echo "  三种下载场景的包会自动合并，公共依赖自动去重"
+echo "  可以多次运行不同场景，包会累积到同一目录"
+echo ""
 echo "日志文件:"
 echo "  完整日志: $DOCKER_LOG"
 if [ -s "$FAILED_PACKAGES_FILE" ]; then
@@ -288,21 +292,26 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo '验证 .deb 包完整性...'
             cd /packages
             ERROR=0
-            for dir in nvidia-driver cuda container-toolkit; do
-                if [ -d \"\$dir\" ]; then
-                    echo \"检查 \$dir 目录...\"
-                    find \"\$dir\" -name '*.deb' | while read deb; do
-                        if ! dpkg -I \"\$deb\" > /dev/null 2>&1; then
-                            echo \"  ✗ 损坏: \$deb\"
-                            ERROR=1
-                        fi
-                    done
+            TOTAL=0
+            VALID=0
+
+            for deb in *.deb; do
+                if [ -f \"\$deb\" ]; then
+                    TOTAL=\$((TOTAL + 1))
+                    if dpkg -I \"\$deb\" > /dev/null 2>&1; then
+                        VALID=\$((VALID + 1))
+                    else
+                        echo \"  ✗ 损坏: \$deb\"
+                        ERROR=1
+                    fi
                 fi
             done
+
+            echo \"检查了 \$TOTAL 个 .deb 包\"
             if [ \$ERROR -eq 0 ]; then
-                echo '✓ 所有包验证通过'
+                echo \"✓ 所有包验证通过 (\$VALID/\$TOTAL)\"
             else
-                echo '⚠ 发现损坏的包'
+                echo \"⚠ 发现损坏的包\"
                 exit 1
             fi
         "
