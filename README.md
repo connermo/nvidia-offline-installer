@@ -36,7 +36,24 @@
 
 ## 快速开始
 
-### 使用交互式向导 (推荐)
+### 方式 1: 使用 Docker 下载 (推荐) 🐳
+
+使用 Docker 在标准 Ubuntu 22.04 环境中下载，确保包的兼容性和完整性：
+
+```bash
+chmod +x download-with-docker.sh
+./download-with-docker.sh
+```
+
+**优势**：
+- ✅ 环境一致性：标准 Ubuntu 22.04 环境
+- ✅ 依赖准确：使用最新的 apt 仓库
+- ✅ 不污染宿主机：完全隔离
+- ✅ 内置验证：自动检查包完整性
+
+详细说明请查看 [DOCKER-USAGE.md](./DOCKER-USAGE.md)
+
+### 方式 2: 使用交互式向导
 
 ```bash
 sudo ./quick-start.sh

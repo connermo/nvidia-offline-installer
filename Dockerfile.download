@@ -1,0 +1,32 @@
+FROM ubuntu:22.04
+
+# 设置环境变量避免交互式提示
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
+
+# 配置 apt 使用最快的镜像源（可选）
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list || true
+
+# 安装基础工具
+RUN apt-get update && apt-get install -y \
+    wget \
+    curl \
+    gnupg2 \
+    ca-certificates \
+    apt-transport-https \
+    software-properties-common \
+    apt-rdepends \
+    dpkg-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建下载目录（将由挂载卷覆盖）
+RUN mkdir -p /packages/nvidia-driver /packages/cuda /packages/container-toolkit
+
+# 设置工作目录为根目录，这样脚本中的 ./packages 会指向 /packages
+WORKDIR /
+
+# 创建符号链接，确保无论当前目录在哪，./packages 都指向 /packages
+RUN ln -sf /packages ./packages 2>/dev/null || true
+
+# 默认命令
+CMD ["/bin/bash"]
