@@ -272,20 +272,46 @@ if ! command -v apt-rdepends &> /dev/null; then
     apt-get install -y apt-rdepends > /dev/null 2>&1
 fi
 
-echo "分析 CUDA 依赖关系..."
+echo "分析并下载 CUDA 依赖关系（这可能需要一些时间）..."
+echo "说明: 将下载 CUDA toolkit 和 runtime 的所有依赖包"
+echo ""
+
+# 收集所有依赖
 ALL_DEPS=""
 for pkg in cuda-toolkit-${CUDA_VERSION_FULL} cuda-runtime-${CUDA_VERSION_FULL}; do
     echo "  分析 $pkg 的依赖..."
-    DEPS=$(apt-rdepends $pkg 2>/dev/null | grep -v "^ " | grep -v "^$pkg$" | grep -v "^Depends:" | grep -v "^PreDepends:" | sort -u)
+    DEPS=$(apt-rdepends $pkg 2>/dev/null | grep -v "^ " | grep -v "^$pkg$" | grep -v "Depends:" | grep -v "PreDepends:" | sort -u | tr '\n' ' ')
     ALL_DEPS="$ALL_DEPS $DEPS"
 done
 
-# 去重
-UNIQUE_DEPS=($(echo "$ALL_DEPS" | tr ' ' '\n' | sort -u | grep -v "^$"))
+# 去重并下载
+UNIQUE_DEPS=$(echo "$ALL_DEPS" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+if [ ! -z "$UNIQUE_DEPS" ]; then
+    # 分批下载，每批20个包
+    BATCH_SIZE=20
+    COUNTER=0
+    BATCH=""
 
-if [ ${#UNIQUE_DEPS[@]} -gt 0 ]; then
-    echo "下载 CUDA 依赖包 (共 ${#UNIQUE_DEPS[@]} 个包)..."
-    download_packages_batch "${UNIQUE_DEPS[@]}"
+    for dep in $UNIQUE_DEPS; do
+        if [ -z "$dep" ]; then
+            continue
+        fi
+
+        BATCH="$BATCH $dep"
+        COUNTER=$((COUNTER + 1))
+
+        if [ $COUNTER -ge $BATCH_SIZE ]; then
+            download_packages_batch "$BATCH" "CUDA 依赖包 (批次 $((COUNTER / BATCH_SIZE)))"
+            BATCH=""
+            COUNTER=0
+            echo ""
+        fi
+    done
+
+    # 下载剩余的包
+    if [ ! -z "$BATCH" ]; then
+        download_packages_batch "$BATCH" "CUDA 依赖包 (最后一批)"
+    fi
 else
     echo -e "${YELLOW}⚠${NC} 未找到额外依赖包"
 fi
