@@ -360,54 +360,50 @@ CUDA_PACKAGES=(
 echo "下载 CUDA 核心包 (${#CUDA_PACKAGES[@]} 个包)..."
 download_packages_batch "${CUDA_PACKAGES[@]}"
 
-# 使用 apt-rdepends 分析和下载所有依赖
-if ! command -v apt-rdepends &> /dev/null; then
-    echo "安装 apt-rdepends 工具..."
-    apt-get install -y apt-rdepends > /dev/null 2>&1
-fi
-
-echo "分析并下载 CUDA 依赖关系（这可能需要一些时间）..."
-echo "说明: 将下载 CUDA toolkit 和 runtime 的所有依赖包"
+echo ""
+echo "分析并下载 CUDA 依赖关系（使用 apt 模拟安装）..."
+echo "说明: 使用 apt-get 模拟安装获取准确的依赖包列表"
 echo ""
 
-# 收集所有依赖
-ALL_DEPS=""
+# 使用 apt-get install --simulate 获取真实依赖列表
+# 这比 apt-rdepends 更准确，只返回真实存在的包
+TEMP_DEPS=$(mktemp)
+
 for pkg in cuda-toolkit-${CUDA_VERSION_FULL} cuda-runtime-${CUDA_VERSION_FULL}; do
     echo "  分析 $pkg 的依赖..."
-    DEPS=$(apt-rdepends $pkg 2>/dev/null | grep -v "^ " | grep -v "^$pkg$" | grep -v "Depends:" | grep -v "PreDepends:" | sort -u | tr '\n' ' ')
-    ALL_DEPS="$ALL_DEPS $DEPS"
+    # 使用 --simulate 模拟安装，获取将要安装的包列表
+    apt-get install --simulate "$pkg" 2>/dev/null | \
+        grep "^Inst " | \
+        awk '{print $2}' | \
+        sort -u >> "$TEMP_DEPS"
 done
 
-# 去重并下载
-UNIQUE_DEPS=$(echo "$ALL_DEPS" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+# 去重并过滤已经下载的核心包
+UNIQUE_DEPS=$(cat "$TEMP_DEPS" | sort -u | \
+    grep -v "cuda-toolkit-${CUDA_VERSION_FULL}" | \
+    grep -v "cuda-runtime-${CUDA_VERSION_FULL}" | \
+    grep -v "cuda-drivers" | \
+    grep -v "cuda-cudart-${CUDA_VERSION_FULL}" | \
+    grep -v "cuda-libraries-${CUDA_VERSION_FULL}" | \
+    grep -v "cuda-nvcc-${CUDA_VERSION_FULL}" | \
+    grep -v "cuda-${CUDA_VERSION_FULL}" | \
+    tr '\n' ' ')
+
+rm -f "$TEMP_DEPS"
+
 if [ ! -z "$UNIQUE_DEPS" ]; then
-    # 分批下载，每批20个包
-    BATCH_SIZE=20
-    COUNTER=0
-    BATCH=""
+    # 转换为数组以计数
+    DEP_ARRAY=($UNIQUE_DEPS)
+    TOTAL_DEPS=${#DEP_ARRAY[@]}
 
-    for dep in $UNIQUE_DEPS; do
-        if [ -z "$dep" ]; then
-            continue
-        fi
+    echo ""
+    echo "发现 $TOTAL_DEPS 个依赖包需要下载"
+    echo ""
 
-        BATCH="$BATCH $dep"
-        COUNTER=$((COUNTER + 1))
-
-        if [ $COUNTER -ge $BATCH_SIZE ]; then
-            download_packages_batch "$BATCH" "CUDA 依赖包 (批次 $((COUNTER / BATCH_SIZE)))"
-            BATCH=""
-            COUNTER=0
-            echo ""
-        fi
-    done
-
-    # 下载剩余的包
-    if [ ! -z "$BATCH" ]; then
-        download_packages_batch "$BATCH" "CUDA 依赖包 (最后一批)"
-    fi
+    # 使用并行下载
+    download_packages_batch "$UNIQUE_DEPS" "CUDA 依赖包" 10
 else
-    echo -e "${YELLOW}⚠${NC} 未找到额外依赖包"
+    echo -e "${YELLOW}⚠${NC} 未找到额外依赖包（可能已经包含在核心包中）"
 fi
 
 # 保存 CUDA repo 配置
