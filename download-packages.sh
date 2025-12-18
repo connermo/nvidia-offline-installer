@@ -121,22 +121,25 @@ echo -e "${YELLOW}后续步骤指引${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
+# 生成日期戳（避免在 echo 中使用 % 符号）
+DATE_STAMP=$(date +%Y%m%d)
+
 echo -e "${CYAN}步骤 1: 打包压缩${NC}"
 echo "在当前机器上执行:"
 echo ""
-echo -e "  ${GREEN}tar -czf nvidia-toolkit-$(date +%Y%m%d).tar.gz packages/ install-offline.sh${NC}"
+echo -e "  ${GREEN}tar -czf nvidia-toolkit-${DATE_STAMP}.tar.gz packages/ install-offline.sh${NC}"
 echo ""
 
 echo -e "${CYAN}步骤 2: 传输到目标机器${NC}"
 echo "使用 SCP 或其他方式传输:"
 echo ""
-echo -e "  ${GREEN}scp nvidia-toolkit-$(date +%Y%m%d).tar.gz user@target-host:/tmp/${NC}"
+echo -e "  ${GREEN}scp nvidia-toolkit-${DATE_STAMP}.tar.gz user@target-host:/tmp/${NC}"
 echo ""
 
 echo -e "${CYAN}步骤 3: 在目标机器上解压并安装${NC}"
 echo ""
 echo -e "  ${GREEN}cd /tmp${NC}"
-echo -e "  ${GREEN}tar -xzf nvidia-toolkit-$(date +%Y%m%d).tar.gz${NC}"
+echo -e "  ${GREEN}tar -xzf nvidia-toolkit-${DATE_STAMP}.tar.gz${NC}"
 echo -e "  ${GREEN}chmod +x install-offline.sh${NC}"
 echo -e "  ${GREEN}sudo ./install-offline.sh${NC}"
 echo ""
